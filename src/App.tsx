@@ -45,27 +45,27 @@ export default function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        const mergedProjects = [...(parsed.projects || [])];
+        
+        // Merge projects carefully: use saved data if available, fallback to initial only if missing
+        const mergedProjects = (parsed.projects || []).map((savedProj: Project) => {
+          const initialProj = initialData.projects.find(p => p.id === savedProj.id);
+          if (!initialProj) return savedProj;
+          return {
+            ...initialProj,
+            ...savedProj
+          };
+        });
+
+        // Add any missing initial projects that aren't in saved data
         initialData.projects.forEach(initialProj => {
-          const existingIdx = mergedProjects.findIndex(p => p.id === initialProj.id);
-          if (existingIdx === -1) {
+          if (!mergedProjects.find((p: Project) => p.id === initialProj.id)) {
             mergedProjects.push(initialProj);
-          } else if (initialProj.id === 'etude-rebranding' || initialProj.id === 'megabox-campaign') {
-            // Force sync for requested projects to ensure metadata like videoUrl/reportUrl is present
-            mergedProjects[existingIdx] = {
-              ...mergedProjects[existingIdx],
-              title: initialProj.title,
-              videoUrl: initialProj.videoUrl || mergedProjects[existingIdx].videoUrl,
-              reportUrl: initialProj.reportUrl || mergedProjects[existingIdx].reportUrl,
-              pdfLabel: initialProj.pdfLabel || mergedProjects[existingIdx].pdfLabel || "PDF 보기",
-              reportLabel: initialProj.reportLabel || mergedProjects[existingIdx].reportLabel || "pdf 리포트 보기"
-            };
           }
         });
         
-        // Force sync skills if structure is different
+        // Handle skills structure
         const savedSkills = parsed.skills || [];
-        const hasNewStructure = savedSkills.some((s: any) => s.title === 'AI Tools');
+        const hasNewStructure = savedSkills.length > 0;
         const finalSkills = hasNewStructure ? savedSkills : initialData.skills;
 
         setData({ 
@@ -77,9 +77,6 @@ export default function App() {
           profile: {
             ...initialData.profile,
             ...(parsed.profile || {}),
-            footerHeadline: parsed.profile?.footerHeadline || initialData.profile.footerHeadline,
-            footerSubtext: parsed.profile?.footerSubtext || initialData.profile.footerSubtext,
-            profileImage: parsed.profile?.profileImage || initialData.profile.profileImage,
           }
         });
       } catch (e) {
